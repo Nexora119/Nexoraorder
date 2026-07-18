@@ -43,7 +43,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-md">
         <h2 className="mb-1">Log in</h2>
         <p className="text-small text-text-secondary mb-6">
-          Welcome back to NexoraOrders.
+          Welcome back to My Takeaway.
         </p>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
