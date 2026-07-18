@@ -59,7 +59,7 @@ export default function SignupPage() {
       <Card className="w-full max-w-md">
         <h2 className="mb-1">Sign up</h2>
         <p className="text-small text-text-secondary mb-6">
-          Create your NexoraOrders account.
+          Create your My Takeaway account.
         </p>
 
         {checkEmailMessage ? (
