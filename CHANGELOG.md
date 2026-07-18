@@ -1,20 +1,25 @@
-# CHANGELOG — Milestone 2, Step 2 (Signup)
+# CHANGELOG — Logo Integration & Rebrand (NexoraOrders → My Takeaway)
 
 ## Added
-- `app/signup/page.tsx` — Signup form (full name, phone, email, password). Calls Supabase `auth.signUp()` with `options.data` to pass `full_name`/`phone` as user metadata. Handles both possible Supabase behaviors: instant session (redirects home) or email-confirmation-required (shows a message instead of redirecting).
-- `02_profile_trigger.sql` — New, standalone migration. Adds a Postgres trigger (`on_auth_user_created`) that fires after every insert into `auth.users`, automatically creating a matching row in `public.profiles` with the metadata passed from signup. Does not alter `01_schema.sql` in any way — kept separate so database changes stay trackable and the original setup file stays intact, per your instruction.
+- `public/logo.png` — Your uploaded logo, background removed (was a JPG with a baked-in cream background; chroma-keyed to transparent, cropped to content, resized to 162×80 for retina display at 81×40).
+- `components/layout/Header.tsx` — New header component. Renders a real `<header>` element (white background, bottom border, per Design System) with the logo as inline `next/image` content inside normal page flow — not an absolutely-positioned overlay. Logo links to `/`.
 
 ## Modified
-- `app/login/page.tsx` — Removed the placeholder text `(coming in the next step)` next to the "Sign up" link, since `/signup` is now a real page. No logic, imports, or structure changed — this was a single line of JSX text removed.
+- `app/layout.tsx` — Imported and rendered `<Header />` above `{children}` so it appears on every page. Updated `metadata.title` from "NexoraOrders — Skip the queue" to "My Takeaway — Skip the queue".
+- `package.json` — `name` field changed from `nexora-orders` to `my-takeaway`.
+- `README.md` — Title and Design System doc reference updated to "My Takeaway".
+- `app/login/page.tsx` — One line of text: "Welcome back to NexoraOrders" → "Welcome back to My Takeaway". No logic changed.
+- `app/signup/page.tsx` — One line of text: "Create your NexoraOrders account" → "Create your My Takeaway account". No logic changed.
+- All approved process docs (Constitution, Business Architecture, Engineering Architecture, Architecture Review, SRS, Roadmap, Design System) — renamed references from NexoraOrders to My Takeaway, since you approved the full project rename. `NexoraOrders_Design_System.md` renamed to `My_Takeaway_Design_System.md`.
 
 ## Removed
 - None.
 
 ## Why each change was required
-- **Signup page**: this step's deliverable per the roadmap (Milestone 2: Login → Signup → Session handling → Protected routes).
-- **Profile trigger**: without it, users created via `auth.signUp()` would have no corresponding `profiles` row, which breaks every RLS policy that joins against `profiles` (see `01_schema.sql`) and would silently fail later features (business registration, order history, etc.) that expect a profile to exist. This is a required dependency of the signup feature, not an optional add-on.
-- **Login page edit**: purely cosmetic correction now that the link target exists; left in because shipping a page that says "coming soon" next to a working link would be misleading.
+- **Logo/Header**: your explicit request — integrate the logo so it reads as part of the page, not an image dropped on top. Achieved via: (1) real background removal so no boxed edge, (2) a semantic `<header>` in normal document flow rather than an overlay, (3) white background matching the approved Design System (you chose this over matching the mockup's beige).
+- **Rebrand**: you approved using the logo as-is and renaming the project to "My Takeaway" — every place the old name appeared needed updating so the codebase and docs stay internally consistent (per NUASEF: "treat the approved Project Bible as the source of truth" — the Constitution itself needed updating to remain accurate).
+- **Image optimization**: the raw background-removed PNG was 415KB — too heavy for a header asset that loads on every page. Resized to the actual display resolution needed (2x for retina), bringing it to 14.5KB with no visible quality loss at header size.
 
 ## Confirmed unchanged
-- `01_schema.sql` — checksum-verified untouched.
-- All other files from Milestone 1 and Step 1 (Login) — untouched.
+- `01_schema.sql`, `02_profile_trigger.sql` — untouched.
+- All Milestone 1 and Milestone 2 Step 1/2 functionality (routing, Button/Card components, auth logic) — untouched, only text/branding edited where noted above.
