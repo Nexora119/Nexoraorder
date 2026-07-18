@@ -1,4 +1,4 @@
-# NexoraOrders
+# My Takeaway
 
 Pickup-only ordering platform for kotas & takeaways. Built with Next.js + Supabase + Vercel + Paystack.
 
@@ -15,4 +15,4 @@ Pickup-only ordering platform for kotas & takeaways. Built with Next.js + Supaba
 - `tailwind.config.ts` — all design tokens (color, type, spacing, radius, shadow) live here — don't hardcode values elsewhere.
 
 ## Design system
-See `NexoraOrders_Design_System.md` for the full spec this project is built against.
+See `My_Takeaway_Design_System.md` for the full spec this project is built against.
