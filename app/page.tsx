@@ -4,6 +4,12 @@ import { Card } from "@/components/ui/Card";
 export default function Home() {
   return (
     <main className="min-h-screen">
+      {/* Account nav */}
+      <div className="px-4 pt-4 max-w-5xl mx-auto flex justify-end gap-3">
+        <Button variant="secondary" href="/login">Log in</Button>
+        <Button variant="primary" href="/signup">Sign up</Button>
+      </div>
+
       {/* Hero */}
       <section className="px-4 py-12 sm:py-16 lg:py-24 max-w-5xl mx-auto text-center">
         <span className="inline-block text-small font-medium text-primary bg-card border border-border rounded-sm px-3 py-1 mb-4">
