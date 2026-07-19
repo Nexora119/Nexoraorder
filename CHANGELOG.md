@@ -1,25 +1,33 @@
-# CHANGELOG — Logo Integration & Rebrand (NexoraOrders → My Takeaway)
+# CHANGELOG — Milestone 2, Step 3 (Session Handling) & Step 4 (Protected Routes)
 
 ## Added
-- `public/logo.png` — Your uploaded logo, background removed (was a JPG with a baked-in cream background; chroma-keyed to transparent, cropped to content, resized to 162×80 for retina display at 81×40).
-- `components/layout/Header.tsx` — New header component. Renders a real `<header>` element (white background, bottom border, per Design System) with the logo as inline `next/image` content inside normal page flow — not an absolutely-positioned overlay. Logo links to `/`.
+
+### Step 3 — Session Handling
+- **`middleware.ts`** (project root — required location for Next.js middleware to run) — thin entry point that delegates to `updateSession()`. Matcher excludes static assets (`_next/static`, `_next/image`, favicon, image files) so the middleware doesn't do unnecessary work on requests that can't have auth state.
+- **`lib/supabase/middleware.ts`** — the actual session-refresh logic, kept separate from `middleware.ts` per standard convention. Creates a Supabase server client bound to the request/response cookies, then calls `supabase.auth.getUser()` **immediately** with no logic in between (this matters — Supabase's docs specifically warn against inserting code between client creation and this call, since it can cause session refresh bugs). Uses `getUser()` rather than `getSession()` because `getUser()` revalidates the token against Supabase's Auth server instead of trusting whatever's in the cookie — this is what "do not trust client-side session state" means in practice. This is the only place in the whole request lifecycle that call happens automatically on every request.
+
+### Step 4 — Protected Routes
+- **`lib/auth/authorize.ts`** — reusable, server-only authorization helpers, deliberately in a separate file/folder from the session-handling code (different concern, as required):
+  - `getAuthUser()` — returns the current user + their `profiles.role`, or `null`. Does not redirect. For places that need to know "is someone logged in" without forcing navigation.
+  - `requireUser()` — redirects to `/login` if not authenticated, otherwise returns the user. For any page that requires being logged in, regardless of role.
+  - `requireRole(allowedRoles)` — redirects to `/login` if not authenticated, or `/unauthorized` if authenticated but the wrong role. Takes an array so a page can allow multiple roles if needed (e.g. `["business_owner", "admin"]`).
+  - Roles match the `user_role` enum already defined in `01_schema.sql`: `customer`, `business_owner`, `admin`.
+- **`app/unauthorized/page.tsx`** — new stub page, same style as the existing `/browse` and `/register` stubs. This exists because `requireRole()` needs somewhere real to send an authenticated-but-wrong-role user — without it, "redirected appropriately" (your requirement) had no valid target. Not a new user-facing feature, just necessary plumbing for Step 4 to function.
 
 ## Modified
-- `app/layout.tsx` — Imported and rendered `<Header />` above `{children}` so it appears on every page. Updated `metadata.title` from "NexoraOrders — Skip the queue" to "My Takeaway — Skip the queue".
-- `package.json` — `name` field changed from `nexora-orders` to `my-takeaway`.
-- `README.md` — Title and Design System doc reference updated to "My Takeaway".
-- `app/login/page.tsx` — One line of text: "Welcome back to NexoraOrders" → "Welcome back to My Takeaway". No logic changed.
-- `app/signup/page.tsx` — One line of text: "Create your NexoraOrders account" → "Create your My Takeaway account". No logic changed.
-- All approved process docs (Constitution, Business Architecture, Engineering Architecture, Architecture Review, SRS, Roadmap, Design System) — renamed references from NexoraOrders to My Takeaway, since you approved the full project rename. `NexoraOrders_Design_System.md` renamed to `My_Takeaway_Design_System.md`.
+- None. This step is purely additive.
 
 ## Removed
 - None.
 
 ## Why each change was required
-- **Logo/Header**: your explicit request — integrate the logo so it reads as part of the page, not an image dropped on top. Achieved via: (1) real background removal so no boxed edge, (2) a semantic `<header>` in normal document flow rather than an overlay, (3) white background matching the approved Design System (you chose this over matching the mockup's beige).
-- **Rebrand**: you approved using the logo as-is and renaming the project to "My Takeaway" — every place the old name appeared needed updating so the codebase and docs stay internally consistent (per NUASEF: "treat the approved Project Bible as the source of truth" — the Constitution itself needed updating to remain accurate).
-- **Image optimization**: the raw background-removed PNG was 415KB — too heavy for a header asset that loads on every page. Resized to the actual display resolution needed (2x for retina), bringing it to 14.5KB with no visible quality loss at header size.
+- **Middleware**: Supabase-issued JWTs expire; without a refresh mechanism, users get silently logged out mid-session. Middleware is the standard place to do this in Next.js App Router because it runs before every request, ahead of Server Components.
+- **Separation of concerns**: you explicitly required session handling and authorization to be separate. `middleware.ts`/`lib/supabase/middleware.ts` know nothing about roles. `lib/auth/authorize.ts` knows nothing about cookie refresh — it assumes the session is already fresh by the time it runs and just asks "who is this, and are they allowed here."
+- **RLS unchanged**: nothing here touches `01_schema.sql` or any RLS policy. These helpers control page-level access (can a user *navigate* here); RLS remains the actual data-access security boundary underneath, exactly as required.
 
-## Confirmed unchanged
-- `01_schema.sql`, `02_profile_trigger.sql` — untouched.
-- All Milestone 1 and Milestone 2 Step 1/2 functionality (routing, Button/Card components, auth logic) — untouched, only text/branding edited where noted above.
+## Not yet wired up (by design)
+No existing page currently calls `requireUser()` or `requireRole()` — there's nothing to protect yet. Milestone 3 (Business Onboarding) will be the first real consumer, e.g. a future business dashboard page starting with:
+```ts
+const user = await requireRole(["business_owner"]);
+```
+This step only had to prepare the mechanism, not apply it anywhere, since the pages that need it don't exist yet.
