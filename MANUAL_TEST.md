@@ -1,36 +1,26 @@
-# MANUAL_TEST.md — Session Handling & Protected Routes
+# MANUAL_TEST.md — Guest Ordering Migration
 
-## 1. Code review only (already done)
-- [x] Brace/syntax balance checked on all 4 new files — clean.
-- [x] `middleware.ts` confirmed at project root (required location — Next.js won't detect it anywhere else).
-- [x] All imports resolve to real files/packages.
-- [x] `CookieOptions` import verified against current `@supabase/ssr` usage patterns (confirmed via research, not assumption, given the earlier `server.ts` build error).
-- [x] `redirect()` null-narrowing pattern in `authorize.ts` confirmed correct per Next.js's own docs (uses the `never` type specifically so this works) — the one isolated-check error I saw was a false positive from checking without real Next.js types available, not a real bug.
+## 1. Code/SQL review only (already done)
+- [x] Brace balance checked on all 3 changed `.tsx` files.
+- [x] SQL migration: balanced parentheses, balanced `$$` dollar-quote pairs (used for the two function bodies).
+- [x] Confirmed dropped policies (`orders_insert_customer`, `orders_select_own_customer`) exist in `01_schema.sql` as expected, and are correctly targeted for removal in the new migration — not accidentally referencing something that doesn't exist.
 
-## 2. Requires Vercel deployment
+## 2. Requires a live Supabase project
+1. Run `03_guest_ordering.sql` in the Supabase SQL Editor (after `01_schema.sql` and `02_profile_trigger.sql`, which should already be applied).
+2. Should execute with no errors — it only alters the existing `orders` table and updates one function.
+3. Open Table Editor → `orders` — confirm new columns exist: `guest_name`, `guest_phone`, `guest_email`, `order_number`, `lookup_token`, `pickup_code`, `refund_reference`.
+4. Open Authentication → Policies → `orders` table — confirm `orders_insert_customer` and `orders_select_own_customer` are gone, and `orders_select_own_business`/`orders_update_business` are still present.
+5. Sign up a brand-new test account at `/signup` — check the `profiles` table afterward, confirm `role` is `business_owner`, not `customer`.
 
-### Session handling
-1. Deploy these files.
-2. Log in at `/login` with a real account.
-3. Open DevTools → Application/Storage → Cookies. Confirm you see Supabase auth cookies (names starting with `sb-`).
-4. Stay logged in and browse around (`/`, `/browse`, `/register`) — confirm the cookies persist and don't disappear.
-5. **Session refresh check**: Supabase access tokens typically expire after 1 hour. If you can wait that long (or adjust the expiry in Supabase Dashboard → Authentication → Settings for testing), stay on the site past that mark and confirm you're NOT logged out — the middleware should silently refresh the token. If you get logged out, the middleware isn't refreshing correctly.
-6. Open DevTools → Network tab, reload any page, and check the response headers for `Set-Cookie` on the initial document request — this confirms the middleware is actively running and managing cookies.
-
-### Protected routes
-There's nothing protected to click through yet (no dashboard exists until Milestone 3), so this is a code-path test rather than a click-through test:
-7. Confirm `/unauthorized` loads correctly on its own — visit it directly in the browser. Should show "You don't have access to this page" with a "Back to home" button.
-8. No visual/behavior changes should be present anywhere else on the site — home, browse, register, login, signup should all look and work exactly as before this step.
-
-## 3. What "working" looks like
-- No new errors in the browser console on any page.
-- No new errors in Vercel's deployment/build logs.
-- Cookies present and persisting across navigation while logged in.
-- `/unauthorized` renders correctly when visited directly.
-- Everything that worked before (homepage nav, login, signup, browse/register stubs) still works identically — this step should be invisible unless you go looking for it.
+## 3. Requires Vercel deployment
+6. Visit `/` — confirm the "Log in"/"Sign up" buttons are gone, replaced by a small "Business login" link top-right.
+7. Click "Business login" — should go to `/login`, now titled "Business login" with updated copy.
+8. Visit `/signup` — should read "Register your business" with updated copy.
+9. Log in with an existing test account — should still work identically to before (mechanism unchanged, only copy changed).
+10. Confirm nothing else on the site changed behavior — browse/register stubs, header logo/logout, session persistence all identical to before this migration.
 
 ## What to report back
-- Any console or build errors.
-- Whether Supabase cookies (`sb-*`) are present after logging in.
-- Confirm `/unauthorized` renders correctly.
-- Confirm nothing else changed behavior.
+- Did the SQL migration run cleanly?
+- Does a new signup correctly get `role = business_owner`?
+- Does the homepage/login/signup copy read correctly for the business-owner framing?
+- Anything unexpected in Vercel logs or browser console?
