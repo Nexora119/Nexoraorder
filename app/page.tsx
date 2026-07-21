@@ -1,13 +1,18 @@
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import Link from "next/link";
 
 export default function Home() {
   return (
     <main className="min-h-screen">
-      {/* Account nav */}
-      <div className="px-4 pt-4 max-w-5xl mx-auto flex justify-end gap-3">
-        <Button variant="secondary" href="/login">Log in</Button>
-        <Button variant="primary" href="/signup">Sign up</Button>
+      {/* Business owner nav — deliberately low-emphasis text link, not a
+          prominent button. Customers browsing as guests should never feel
+          like an account is expected of them; this is here only so a
+          returning business owner has a way to find their login. */}
+      <div className="px-4 pt-4 max-w-5xl mx-auto flex justify-end">
+        <Link href="/login" className="text-small text-text-secondary hover:text-primary">
+          Business login
+        </Link>
       </div>
 
       {/* Hero */}
