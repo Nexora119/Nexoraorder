@@ -2,6 +2,7 @@
 
 import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -22,44 +23,56 @@ export default function SignupPage() {
     setCheckEmailMessage(null);
     setLoading(true);
 
-    const supabase = createClient();
-    const { data, error: signUpError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: fullName,
-          phone,
+    try {
+      const supabase = createClient();
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: fullName,
+            phone,
+          },
         },
-      },
-    });
+      });
 
-    setLoading(false);
+      if (signUpError) {
+        setError(signUpError.message);
+        return;
+      }
 
-    if (signUpError) {
-      setError(signUpError.message);
-      return;
-    }
-
-    // Supabase's default behavior: if email confirmation is required in your
-    // project's Auth settings, `session` will be null here even though the
-    // user was created. Handle both cases so this works either way.
-    if (data.session) {
-      router.push("/");
-      router.refresh();
-    } else {
-      setCheckEmailMessage(
-        "Account created. Check your email to confirm your address before logging in."
+      // Supabase's default behavior: if email confirmation is required in
+      // your project's Auth settings, `session` will be null here even
+      // though the user was created. Handle both cases so this works
+      // either way.
+      if (data.session) {
+        router.push("/");
+        router.refresh();
+      } else {
+        setCheckEmailMessage(
+          "Account created. Check your email to confirm your address before logging in."
+        );
+      }
+    } catch (err) {
+      // createClient() throws if Supabase env vars are misconfigured —
+      // without this catch, that would leave the button stuck on
+      // "Creating account..." forever with no explanation.
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Something went wrong. Please try again."
       );
+    } finally {
+      setLoading(false);
     }
   }
 
   return (
     <main className="min-h-screen flex items-center justify-center px-4 py-12">
       <Card className="w-full max-w-md">
-        <h2 className="mb-1">Sign up</h2>
+        <h1 className="mb-1 text-h2">Register your business</h1>
         <p className="text-small text-text-secondary mb-6">
-          Create your My Takeaway account.
+          Create your My Takeaway business owner account.
         </p>
 
         {checkEmailMessage ? (
@@ -75,6 +88,7 @@ export default function SignupPage() {
               <input
                 id="fullName"
                 type="text"
+                autoComplete="name"
                 required
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
@@ -91,6 +105,7 @@ export default function SignupPage() {
               <input
                 id="phone"
                 type="tel"
+                autoComplete="tel"
                 required
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
@@ -107,6 +122,7 @@ export default function SignupPage() {
               <input
                 id="email"
                 type="email"
+                autoComplete="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -123,6 +139,7 @@ export default function SignupPage() {
               <input
                 id="password"
                 type="password"
+                autoComplete="new-password"
                 required
                 minLength={6}
                 value={password}
@@ -139,7 +156,13 @@ export default function SignupPage() {
               </p>
             )}
 
-            <Button type="submit" variant="primary" disabled={loading} className="mt-2">
+            <Button
+              type="submit"
+              variant="primary"
+              disabled={loading}
+              aria-busy={loading}
+              className="mt-2"
+            >
               {loading ? "Creating account..." : "Sign up"}
             </Button>
           </form>
@@ -147,9 +170,9 @@ export default function SignupPage() {
 
         <p className="text-small text-text-secondary mt-6 text-center">
           Already have an account?{" "}
-          <a href="/login" className="text-primary font-medium">
+          <Link href="/login" className="text-primary font-medium">
             Log in
-          </a>
+          </Link>
         </p>
       </Card>
     </main>
