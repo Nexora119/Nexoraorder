@@ -2,6 +2,7 @@
 
 import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -18,32 +19,44 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
 
-    const supabase = createClient();
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      const supabase = createClient();
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    setLoading(false);
+      if (signInError) {
+        setError(signInError.message);
+        return;
+      }
 
-    if (signInError) {
-      setError(signInError.message);
-      return;
+      // Redirect after successful login. Route protection based on role
+      // is handled in a later step (protected routes) — for now this just
+      // confirms the session was created.
+      router.push("/");
+      router.refresh();
+    } catch (err) {
+      // createClient() throws if Supabase env vars are misconfigured —
+      // without this catch, that would leave the button stuck on
+      // "Logging in..." forever with no explanation. Show a real message
+      // instead.
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Something went wrong. Please try again."
+      );
+    } finally {
+      setLoading(false);
     }
-
-    // Redirect after successful login. Route protection based on role
-    // is handled in a later step (protected routes) — for now this just
-    // confirms the session was created.
-    router.push("/");
-    router.refresh();
   }
 
   return (
     <main className="min-h-screen flex items-center justify-center px-4 py-12">
       <Card className="w-full max-w-md">
-        <h2 className="mb-1">Log in</h2>
+        <h1 className="mb-1 text-h2">Business login</h1>
         <p className="text-small text-text-secondary mb-6">
-          Welcome back to My Takeaway.
+          Log in to manage your business, menu, and orders.
         </p>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -54,6 +67,7 @@ export default function LoginPage() {
             <input
               id="email"
               type="email"
+              autoComplete="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -70,6 +84,7 @@ export default function LoginPage() {
             <input
               id="password"
               type="password"
+              autoComplete="current-password"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -85,16 +100,22 @@ export default function LoginPage() {
             </p>
           )}
 
-          <Button type="submit" variant="primary" disabled={loading} className="mt-2">
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={loading}
+            aria-busy={loading}
+            className="mt-2"
+          >
             {loading ? "Logging in..." : "Log in"}
           </Button>
         </form>
 
         <p className="text-small text-text-secondary mt-6 text-center">
-          Don&apos;t have an account?{" "}
-          <a href="/signup" className="text-primary font-medium">
-            Sign up
-          </a>
+          New business?{" "}
+          <Link href="/signup" className="text-primary font-medium">
+            Register your business
+          </Link>
         </p>
       </Card>
     </main>
