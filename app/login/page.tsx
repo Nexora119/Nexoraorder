@@ -1,14 +1,12 @@
 "use client";
 
 import { useState, FormEvent } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 
 export default function LoginPage() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -31,11 +29,12 @@ export default function LoginPage() {
         return;
       }
 
-      // Redirect after successful login. Route protection based on role
-      // is handled in a later step (protected routes) — for now this just
-      // confirms the session was created.
-      router.push("/");
-      router.refresh();
+      // Hard navigation (not router.push + router.refresh) — guarantees a
+      // fresh full request to "/", so the root layout's Header re-runs
+      // getAuthUser() against the just-set session cookie with zero
+      // ambiguity about client-router refresh timing.
+      window.location.href = "/";
+      return;
     } catch (err) {
       // createClient() throws if Supabase env vars are misconfigured —
       // without this catch, that would leave the button stuck on
