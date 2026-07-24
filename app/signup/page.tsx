@@ -1,14 +1,12 @@
 "use client";
 
 import { useState, FormEvent } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 
 export default function SignupPage() {
-  const router = useRouter();
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
@@ -46,8 +44,10 @@ export default function SignupPage() {
       // though the user was created. Handle both cases so this works
       // either way.
       if (data.session) {
-        router.push("/");
-        router.refresh();
+        // Hard navigation — see app/login/page.tsx for why this replaced
+        // router.push + router.refresh.
+        window.location.href = "/";
+        return;
       } else {
         setCheckEmailMessage(
           "Account created. Check your email to confirm your address before logging in."
