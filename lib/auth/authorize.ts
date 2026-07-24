@@ -30,34 +30,64 @@ export interface AuthedUser {
  * Calls supabase.auth.getUser() once. If you need the user in multiple
  * places on the same page, call this once and pass the result down rather
  * than calling it again.
+ *
+ * IMPORTANT: this function is called from Header.tsx, which renders on
+ * EVERY page via the root layout — unlike a normal Server Component with
+ * an isolated error boundary, a failure here has global blast radius. So
+ * unlike lib/supabase/server.ts's createClient() (which deliberately
+ * throws on misconfigured env vars — correct for an isolated component),
+ * this function must never let that propagate. Any unexpected failure
+ * (missing/invalid env vars, network issue, etc.) is treated the same as
+ * "not logged in" rather than crashing every route on the site.
  */
 export async function getAuthUser(): Promise<AuthedUser | null> {
-  const supabase = createClient();
+  try {
+    const supabase = createClient();
 
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser();
 
-  if (error || !user) {
+    if (error) {
+      console.error("[getAuthUser] auth.getUser() returned an error:", error.message);
+      return null;
+    }
+
+    if (!user) {
+      // Normal, expected case — no session cookie present. Not an error.
+      return null;
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+    if (profileError) {
+      console.error(
+        `[getAuthUser] profiles lookup failed for user ${user.id}:`,
+        profileError.message
+      );
+      return null;
+    }
+
+    if (!profile) {
+      console.error(`[getAuthUser] No profiles row found for authenticated user ${user.id}`);
+      return null;
+    }
+
+    return {
+      id: user.id,
+      email: user.email,
+      role: profile.role as UserRole,
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    console.error("[getAuthUser] Unexpected exception:", message);
     return null;
   }
-
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (profileError || !profile) {
-    return null;
-  }
-
-  return {
-    id: user.id,
-    email: user.email,
-    role: profile.role as UserRole,
-  };
 }
 
 /**
