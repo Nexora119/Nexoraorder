@@ -29,6 +29,29 @@ export default function LoginPage() {
         return;
       }
 
+      // Check whether this business owner already has a business — if not,
+      // there's nothing useful at "/" for them yet (no dashboard exists
+      // until later in Milestone 3), so send them straight to registration
+      // instead of a dead end. RLS already scopes this query to their own
+      // business (businesses_select_active_public policy's owner_id =
+      // auth.uid() branch), so this is safe as a direct browser-client call.
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (user) {
+        const { data: existingBusiness } = await supabase
+          .from("businesses")
+          .select("id")
+          .eq("owner_id", user.id)
+          .maybeSingle();
+
+        if (!existingBusiness) {
+          window.location.href = "/business/register";
+          return;
+        }
+      }
+
       // Hard navigation (not router.push + router.refresh) — guarantees a
       // fresh full request to "/", so the root layout's Header re-runs
       // getAuthUser() against the just-set session cookie with zero
