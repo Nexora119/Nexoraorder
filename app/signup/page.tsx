@@ -1,62 +1,72 @@
 "use client";
 
-import { useState, FormEvent } from "react";
+import { Suspense, useState, FormEvent } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 
-export default function SignupPage() {
-  const [fullName, setFullName] = useState("");
-  const [phone, setPhone] = useState("");
+function LoginForm() {
+  const searchParams = useSearchParams();
+  const confirmationFailed = searchParams.get("error") === "confirmation_failed";
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [checkEmailMessage, setCheckEmailMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    setCheckEmailMessage(null);
     setLoading(true);
 
     try {
       const supabase = createClient();
-      const { data, error: signUpError } = await supabase.auth.signUp({
+      const { error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
-        options: {
-          data: {
-            full_name: fullName,
-            phone,
-          },
-        },
       });
 
-      if (signUpError) {
-        setError(signUpError.message);
+      if (signInError) {
+        setError(signInError.message);
         return;
       }
 
-      // Supabase's default behavior: if email confirmation is required in
-      // your project's Auth settings, `session` will be null here even
-      // though the user was created. Handle both cases so this works
-      // either way.
-      if (data.session) {
-        // Straight to business registration — the only reason anyone signs
-        // up now is to register a business (see app/business/register).
-        window.location.href = "/business/register";
-        return;
-      } else {
-        setCheckEmailMessage(
-          "Account created. Check your email to confirm your address before logging in."
-        );
+      // Check whether this business owner already has a business — if not,
+      // there's nothing useful at "/" for them yet (no dashboard exists
+      // until later in Milestone 3), so send them straight to registration
+      // instead of a dead end. RLS already scopes this query to their own
+      // business (businesses_select_active_public policy's owner_id =
+      // auth.uid() branch), so this is safe as a direct browser-client call.
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (user) {
+        const { data: existingBusiness } = await supabase
+          .from("businesses")
+          .select("id")
+          .eq("owner_id", user.id)
+          .maybeSingle();
+
+        if (!existingBusiness) {
+          window.location.href = "/business/register";
+          return;
+        }
       }
+
+      // Hard navigation (not router.push + router.refresh) — guarantees a
+      // fresh full request to "/", so the root layout's Header re-runs
+      // getAuthUser() against the just-set session cookie with zero
+      // ambiguity about client-router refresh timing.
+      window.location.href = "/";
+      return;
     } catch (err) {
       // createClient() throws if Supabase env vars are misconfigured —
       // without this catch, that would leave the button stuck on
-      // "Creating account..." forever with no explanation.
+      // "Logging in..." forever with no explanation. Show a real message
+      // instead.
       setError(
         err instanceof Error
           ? err.message
@@ -70,111 +80,85 @@ export default function SignupPage() {
   return (
     <main className="min-h-screen flex items-center justify-center px-4 py-12">
       <Card className="w-full max-w-md">
-        <h1 className="mb-1 text-h2">Register your business</h1>
+        <h1 className="mb-1 text-h2">Business login</h1>
         <p className="text-small text-text-secondary mb-6">
-          Create your My Takeaway business owner account.
+          Log in to manage your business, menu, and orders.
         </p>
 
-        {checkEmailMessage ? (
-          <p className="text-small text-success" role="status">
-            {checkEmailMessage}
+        {confirmationFailed && (
+          <p className="text-small text-danger bg-danger/10 border border-danger rounded-md px-3 py-2 mb-4" role="alert">
+            Your confirmation link didn&apos;t work or has expired. Please try
+            logging in, or sign up again if you haven&apos;t confirmed yet.
           </p>
-        ) : (
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            <div>
-              <label htmlFor="fullName" className="block text-small font-medium mb-1">
-                Full name
-              </label>
-              <input
-                id="fullName"
-                type="text"
-                autoComplete="name"
-                required
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                className="w-full rounded-md border border-border px-4 py-3 text-body
-                           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                placeholder="Jane Dlamini"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="phone" className="block text-small font-medium mb-1">
-                Phone number
-              </label>
-              <input
-                id="phone"
-                type="tel"
-                autoComplete="tel"
-                required
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="w-full rounded-md border border-border px-4 py-3 text-body
-                           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                placeholder="081 234 5678"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="email" className="block text-small font-medium mb-1">
-                Email
-              </label>
-              <input
-                id="email"
-                type="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-md border border-border px-4 py-3 text-body
-                           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                placeholder="you@example.com"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="password" className="block text-small font-medium mb-1">
-                Password
-              </label>
-              <input
-                id="password"
-                type="password"
-                autoComplete="new-password"
-                required
-                minLength={6}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-md border border-border px-4 py-3 text-body
-                           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                placeholder="At least 6 characters"
-              />
-            </div>
-
-            {error && (
-              <p className="text-small text-danger" role="alert">
-                {error}
-              </p>
-            )}
-
-            <Button
-              type="submit"
-              variant="primary"
-              disabled={loading}
-              aria-busy={loading}
-              className="mt-2"
-            >
-              {loading ? "Creating account..." : "Sign up"}
-            </Button>
-          </form>
         )}
 
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <div>
+            <label htmlFor="email" className="block text-small font-medium mb-1">
+              Email
+            </label>
+            <input
+              id="email"
+              type="email"
+              autoComplete="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full rounded-md border border-border px-4 py-3 text-body
+                         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              placeholder="you@example.com"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="password" className="block text-small font-medium mb-1">
+              Password
+            </label>
+            <input
+              id="password"
+              type="password"
+              autoComplete="current-password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full rounded-md border border-border px-4 py-3 text-body
+                         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              placeholder="••••••••"
+            />
+          </div>
+
+          {error && (
+            <p className="text-small text-danger" role="alert">
+              {error}
+            </p>
+          )}
+
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={loading}
+            aria-busy={loading}
+            className="mt-2"
+          >
+            {loading ? "Logging in..." : "Log in"}
+          </Button>
+        </form>
+
         <p className="text-small text-text-secondary mt-6 text-center">
-          Already have an account?{" "}
-          <Link href="/login" className="text-primary font-medium">
-            Log in
+          New business?{" "}
+          <Link href="/signup" className="text-primary font-medium">
+            Register your business
           </Link>
         </p>
       </Card>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   );
 }
