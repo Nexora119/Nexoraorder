@@ -44,9 +44,9 @@ export default function SignupPage() {
       // though the user was created. Handle both cases so this works
       // either way.
       if (data.session) {
-        // Hard navigation — see app/login/page.tsx for why this replaced
-        // router.push + router.refresh.
-        window.location.href = "/";
+        // Straight to business registration — the only reason anyone signs
+        // up now is to register a business (see app/business/register).
+        window.location.href = "/business/register";
         return;
       } else {
         setCheckEmailMessage(
