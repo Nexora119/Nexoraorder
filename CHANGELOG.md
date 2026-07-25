@@ -1,15 +1,17 @@
-# CHANGELOG — Guest Ordering Migration
+# CHANGELOG — Milestone 3: Business Registration
 
 ## Added
-- `03_guest_ordering.sql` — additive schema migration (see HARDENING_REPORT.md for full detail): nullable `customer_id`, guest contact fields, `order_number`/`lookup_token`/`pickup_code`, `refund_reference`, updated CHECK constraint, dropped obsolete customer-auth RLS policies, updated profile-creation trigger's default role.
+- `app/business/register/page.tsx` — protected page (business_owner only).
+- `components/business/BusinessRegistrationForm.tsx` — the actual registration form (name, category, description, structured address, business email/phone, operating hours as free text). No payment fields, per your decision to defer to Milestone 6.
 
 ## Modified
-- `app/page.tsx` — removed customer-facing Log in/Sign up buttons, added a small "Business login" text link instead.
-- `app/login/page.tsx` — copy only ("Business login" framing, updated footer link text).
-- `app/signup/page.tsx` — copy only ("Register your business" framing).
+- `app/page.tsx` — "List your business" → `/signup` (was `/register`).
+- `app/signup/page.tsx` — successful signup redirects to `/business/register` (was `/`).
+- `app/login/page.tsx` — after login, checks for an existing business; redirects to `/business/register` if none found, otherwise `/`.
+- `app/register/page.tsx` — old stub converted to a redirect to `/signup`.
 
 ## Removed
-- None (RLS policy drops happen inside the new migration file, not by deleting anything from `01_schema.sql`).
+- None.
 
 ## Why
-Implements the approved Option B guest-ordering architecture: customers never need accounts; only business owners and admins authenticate. See `Guest_Ordering_Migration_Plan.md` (delivered earlier) for the full design rationale, and `HARDENING_REPORT.md` in this delta for the security/architecture audit.
+First deliverable of Milestone 3 (Business Onboarding), per the roadmap. Reuses 100% of Milestone 2's authentication infrastructure (`requireRole`, session middleware, RLS) with zero changes to any of it.
