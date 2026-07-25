@@ -1,12 +1,16 @@
 "use client";
 
-import { useState, FormEvent } from "react";
+import { Suspense, useState, FormEvent } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 
-export default function LoginPage() {
+function LoginForm() {
+  const searchParams = useSearchParams();
+  const confirmationFailed = searchParams.get("error") === "confirmation_failed";
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -81,6 +85,13 @@ export default function LoginPage() {
           Log in to manage your business, menu, and orders.
         </p>
 
+        {confirmationFailed && (
+          <p className="text-small text-danger bg-danger/10 border border-danger rounded-md px-3 py-2 mb-4" role="alert">
+            Your confirmation link didn&apos;t work or has expired. Please try
+            logging in, or sign up again if you haven&apos;t confirmed yet.
+          </p>
+        )}
+
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div>
             <label htmlFor="email" className="block text-small font-medium mb-1">
@@ -141,5 +152,13 @@ export default function LoginPage() {
         </p>
       </Card>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginForm />
+    </Suspense>
   );
 }
