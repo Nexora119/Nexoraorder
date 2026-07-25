@@ -29,7 +29,7 @@ export default function Home() {
         </p>
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <Button variant="primary" href="/browse">Find food near you</Button>
-          <Button variant="secondary" href="/register">List your business</Button>
+          <Button variant="secondary" href="/signup">List your business</Button>
         </div>
       </section>
 
