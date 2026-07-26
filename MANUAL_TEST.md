@@ -1,17 +1,31 @@
-# MANUAL_TEST.md — Duplicate Email Signup UX Fix
+# MANUAL_TEST.md — Admin Approval Panel
+
+## Prerequisite
+You need at least one account with `role = 'admin'` in `profiles` (per Milestone 2, this is set manually — e.g. via the optional `UPDATE` in `04_backfill_missing_profiles.sql`, or directly in Supabase's Table Editor).
+
+Also confirm `SUPABASE_SERVICE_ROLE_KEY` is set in Vercel for Production (you were asked to grab this "while you were there" back in the env var recovery step — this is the first feature that actually needs it).
 
 ## Requires Vercel deployment
-1. Deploy the updated `app/signup/page.tsx`.
-2. Open browser DevTools console before testing (so you catch the logged response).
-3. Sign up with a **brand-new** email — confirm:
-   - Console shows the full `{ data, error }` response, with `data.user.identities` containing 1 item.
-   - UI shows "Account created. Check your email..."
-4. Try signing up **again with the exact same email** you just used in step 3 (should still be unconfirmed at this point):
-   - Check what the console shows for `identities` this time — Supabase's behavior can vary depending on whether the existing account is confirmed or not, so note what you actually see.
-5. Confirm the first account via its email link, then try signing up a **third time with that same now-confirmed email**:
-   - Console should show `data.user.identities` as an empty array.
-   - UI should show the new neutral message ("If an account with this email doesn't already exist...") — NOT "Account created."
+1. Deploy `lib/admin/actions.ts` and `app/admin/page.tsx`.
+2. Log in with a **non-admin** business owner account, visit `/admin` directly — should redirect to `/unauthorized`.
+3. Log out, log in with your **admin** account, visit `/admin` — should load, no redirect.
+4. If you have a business already submitted (from testing Business Registration), it should appear under "Pending review" with its details and Approve/Reject controls.
+5. Click **Approve** on a pending business:
+   - Page should refresh showing it under "All other businesses" with status `active`.
+   - Check Supabase Table Editor → `businesses`: confirm `status = 'active'`, `approved_at` set, `approved_by` = your admin profile id, `trial_start_date` set.
+   - Check `subscriptions` table: confirm a new row exists for that business with `billing_status = 'trial'` and `trial_end_date` ≈ 30 days from now.
+6. Submit a second test business (via `/business/register` with a different test account), then **Reject** it with a reason typed in the text field:
+   - Should move to "All other businesses" with status `rejected` and show the reason you typed.
+7. Try rejecting a third test business with the reason field **left blank**:
+   - Should still work, showing "No reason provided."
+8. On an **active** business, click **Deactivate**:
+   - Status should change to `inactive`.
+9. Confirm a **customer/guest** browsing `/browse` never sees pending, rejected, or inactive businesses — only active ones (this was already true before this feature via existing RLS on `businesses_select_active_public`, just confirming nothing regressed).
+10. Check browser console and Vercel Function logs throughout — no unexpected errors.
 
 ## What to report back
-- Paste what the console actually logged for step 5 (the masked-duplicate case) — confirms whether Supabase's real behavior matches what this fix assumes.
-- Does the UI message correctly differ between a new signup and a duplicate?
+- Does role-based access work correctly (non-admin blocked, admin allowed)?
+- Does approval correctly create both the business status change AND the subscription row?
+- Does rejection with and without a reason both work?
+- Does deactivation work?
+- Anything unexpected in logs?
