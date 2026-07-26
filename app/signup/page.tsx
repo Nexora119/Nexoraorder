@@ -48,10 +48,6 @@ export default function SignupPage() {
       // Full raw response, as requested — inspect this in the browser
       // console to see exactly what Supabase returns for a genuinely new
       // signup vs. a duplicate email.
-      console.log("[signup] Supabase signUp() response:", {
-        data,
-        error: signUpError,
-      });
 
       // Supabase's signUp() deliberately does NOT reveal whether an email is
       // already registered, when email confirmation is required — this is
