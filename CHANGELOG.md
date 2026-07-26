@@ -1,14 +1,13 @@
-# CHANGELOG — Email Confirmation Session Fix
-
-## Added
-- `app/auth/callback/route.ts` — exchanges the PKCE confirmation code for a real session, then redirects to `/business/register` (no business yet) or `/` (already has one).
+# CHANGELOG — Duplicate Email Signup UX Fix
 
 ## Modified
-- `app/signup/page.tsx` — added `emailRedirectTo` pointing at the new callback route.
-- `app/login/page.tsx` — restructured with a `Suspense` boundary (required for `useSearchParams()`), added a visible error banner for failed confirmations.
+- `app/signup/page.tsx` — `handleSubmit` now:
+  - Logs the full raw `{ data, error }` Supabase response to the browser console.
+  - Detects Supabase's anti-enumeration "masked duplicate" response (`data.user.identities.length === 0`) and shows a neutral, honest message instead of falsely claiming "Account created."
+  - Genuinely new signups still show "Account created" as before.
 
-## Removed
-- None.
+## Added / Removed
+None.
 
-## Action required from you (not code)
-Add the callback URL to Supabase's allowed Redirect URLs list — see HARDENING_REPORT.md for exact steps. The fix will not take effect until this is done.
+## Why
+You reported duplicate email signups always showed "Account created" — root cause was Supabase's intentional fake-success response for already-registered emails (see HARDENING_REPORT.md), not a bug in our error handling per se, just an unhandled third case.

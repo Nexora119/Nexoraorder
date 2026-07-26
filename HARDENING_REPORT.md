@@ -1,28 +1,20 @@
-# HARDENING_REPORT.md — Email Confirmation Session Fix
+# HARDENING_REPORT.md — Duplicate Email Signup UX Fix
 
-**Scope:** New auth callback route, changed signup redirect target. Triggers our standing audit-report rule (authentication).
+**Scope:** Signup response handling. Triggers our standing audit-report rule (authentication).
 
 ## Root cause
-`signUp()` never set `emailRedirectTo`, and no route existed to handle Supabase's PKCE-flow confirmation redirect (`?code=...`). The code arrived at `/` and was silently ignored — no session was ever established, despite the email confirmation itself succeeding.
+Not a bug in our code's logic so much as an incomplete response-handling case: Supabase's `signUp()` intentionally returns a **fake-success response** (no `error`) when email confirmation is required and the email already belongs to a confirmed user — this is deliberate anti-enumeration behavior on Supabase's side, preventing attackers from probing which emails are registered by checking for a different error response. Our code only branched on `data.session` (always `null` in both the genuinely-new and masked-duplicate cases), so both were indistinguishable and both fell through to "Account created."
 
 ## Fix
-- **`app/auth/callback/route.ts`** (new) — exchanges the `code` for a real session via `exchangeCodeForSession()`, using the existing, unchanged `lib/supabase/server.ts` client (its cookie-writing logic already handles this correctly — Route Handlers, unlike plain Server Components, can genuinely set cookies on the response).
-- **`app/signup/page.tsx`** — `emailRedirectTo` now points at this new route.
-- **`app/login/page.tsx`** — restructured to use `useSearchParams()` inside a `Suspense` boundary (a hard Next.js requirement, not optional — omitting it causes a build-time warning/error), to show a clear message if someone lands here via a failed confirmation.
+Added a check on `data.user.identities.length === 0` — Supabase's one reliable signal for this case (a genuinely new signup has exactly one identity; a masked duplicate has zero). Three distinct outcomes now handled:
+1. `data.session` present → immediate login, redirect to `/business/register` (unchanged).
+2. Masked duplicate detected → neutral message: doesn't falsely claim an account was created, but also doesn't explicitly confirm the email is taken.
+3. Genuinely new signup → "Account created..." (unchanged, now only shown when actually true).
 
-## Required manual step — cannot be done from code
-Supabase rejects any `emailRedirectTo` that isn't on its allow-list and silently falls back to the default Site URL instead — meaning this fix does nothing until you add the callback URL in Supabase's dashboard:
+Also added: full raw `{ data, error }` logged to the browser console, as requested, so the exact Supabase response is inspectable during testing.
 
-**Authentication → URL Configuration → Redirect URLs**, add:
-- `https://<your-production-domain>/auth/callback`
-- `http://localhost:3000/auth/callback` (only if you test locally)
-
-## Security review
-| Concern | Assessment |
-|---|---|
-| Can this callback be used to hijack someone else's session? | No — `exchangeCodeForSession` only succeeds with a valid, single-use code Supabase itself issued for that specific confirmation email. |
-| Does a failed exchange leak error detail to the user? | No — logged server-side only (`console.error`), user just sees a generic "didn't work or expired" message. |
-| Does this change any RLS policy or existing auth flow? | No — reuses `lib/supabase/server.ts` unchanged; the "does this user have a business" check duplicates existing logic already in `app/login/page.tsx`, not new authorization logic. |
+## Why the message stays deliberately non-committal
+Explicitly saying "this email is already registered" would defeat Supabase's own anti-enumeration protection — anyone could then probe arbitrary emails to discover who has an account. The chosen wording ("If an account with this email doesn't already exist... Already registered? Try logging in instead.") is honest and actionable without confirming or denying which case applies. This is a deliberate security trade-off, not an oversight — happy to revisit if you'd rather prioritize UX clarity over enumeration protection, but defaulting to the more secure/standard pattern.
 
 ## What did NOT change
-`lib/supabase/*`, `lib/auth/*`, `middleware.ts`, RLS policies, `01_schema.sql` — all unaffected.
+`lib/supabase/*`, `lib/auth/*`, RLS policies, the login page, the auth callback route — all unaffected. Only `app/signup/page.tsx`'s response-handling logic changed.
