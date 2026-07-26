@@ -45,10 +45,6 @@ export default function SignupPage() {
         return;
       }
 
-      // Full raw response, as requested — inspect this in the browser
-      // console to see exactly what Supabase returns for a genuinely new
-      // signup vs. a duplicate email.
-
       // Supabase's signUp() deliberately does NOT reveal whether an email is
       // already registered, when email confirmation is required — this is
       // intentional anti-enumeration behavior on Supabase's side, not a bug.
