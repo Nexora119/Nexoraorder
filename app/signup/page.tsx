@@ -45,15 +45,38 @@ export default function SignupPage() {
         return;
       }
 
-      // Supabase's default behavior: if email confirmation is required in
-      // your project's Auth settings, `session` will be null here even
-      // though the user was created. Handle both cases so this works
-      // either way.
+      // Full raw response, as requested — inspect this in the browser
+      // console to see exactly what Supabase returns for a genuinely new
+      // signup vs. a duplicate email.
+      console.log("[signup] Supabase signUp() response:", {
+        data,
+        error: signUpError,
+      });
+
+      // Supabase's signUp() deliberately does NOT reveal whether an email is
+      // already registered, when email confirmation is required — this is
+      // intentional anti-enumeration behavior on Supabase's side, not a bug.
+      // Instead of an error, it returns success with data.session === null
+      // AND data.user.identities as an EMPTY array (a genuinely new signup
+      // has identities.length === 1). That's the only reliable signal to
+      // tell the two cases apart client-side.
+      const isMaskedDuplicate =
+        !!data.user && !!data.user.identities && data.user.identities.length === 0;
+
       if (data.session) {
         // Straight to business registration — the only reason anyone signs
         // up now is to register a business (see app/business/register).
         window.location.href = "/business/register";
         return;
+      } else if (isMaskedDuplicate) {
+        // Deliberately non-committal message: doesn't lie by claiming an
+        // account was created, but also doesn't explicitly confirm the
+        // email is taken (that would defeat Supabase's own anti-enumeration
+        // protection). Points them toward login without giving away
+        // whether this specific email exists.
+        setCheckEmailMessage(
+          "If an account with this email doesn't already exist, we've sent a confirmation link to your inbox. Already registered? Try logging in instead."
+        );
       } else {
         setCheckEmailMessage(
           "Account created. Check your email to confirm your address before logging in."
