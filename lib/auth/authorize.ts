@@ -70,10 +70,9 @@ export async function getAuthUser(): Promise<AuthedUser | null> {
       .eq("id", user.id)
       .single();
 
-    console.log("[PROFILE DEBUG]", {
-      profile,
-      profileError,
-    });
+    console.log(
+      `[ROLE DEBUG] role="${profile?.role}" length=${profile?.role?.length}`
+    );
 
     if (profileError) {
       console.error(
@@ -127,6 +126,12 @@ export async function requireUser(): Promise<AuthedUser> {
  */
 export async function requireRole(allowedRoles: UserRole[]): Promise<AuthedUser> {
   const user = await requireUser();
+
+  console.log("[REQUIRE ROLE]", {
+    userRole: user.role,
+    allowedRoles,
+    includes: allowedRoles.includes(user.role),
+  });
 
   if (!allowedRoles.includes(user.role)) {
     redirect("/unauthorized");
