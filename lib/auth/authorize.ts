@@ -49,6 +49,11 @@ export async function getAuthUser(): Promise<AuthedUser | null> {
       error,
     } = await supabase.auth.getUser();
 
+    console.log("[AUTH DEBUG]", {
+      authUserId: user?.id,
+      authEmail: user?.email,
+    });
+
     if (error) {
       console.error("[getAuthUser] auth.getUser() returned an error:", error.message);
       return null;
@@ -64,6 +69,11 @@ export async function getAuthUser(): Promise<AuthedUser | null> {
       .select("role")
       .eq("id", user.id)
       .single();
+
+    console.log("[PROFILE DEBUG]", {
+      profile,
+      profileError,
+    });
 
     if (profileError) {
       console.error(
