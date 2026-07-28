@@ -1,25 +1,24 @@
-# HARDENING_REPORT.md — Business Dashboard Shell
+# HARDENING_REPORT.md — Business Dashboard Subscription Display Fix
 
-**Scope:** New protected route, changed redirect targets across 3 files. Triggers our standing audit-report rule (authentication).
+**Scope:** Query and display logic in one file. Triggers our standing audit-report rule (database access).
 
-## No new gap this time
-Unlike the admin panel, this required **no service-role client and no new RLS policies**. The dashboard only ever shows a business owner their own data, and existing RLS already permits that: `businesses_select_active_public`'s `owner_id = auth.uid()` branch, and `subscriptions_select_own`. Uses the regular server client, same as every other owner-facing page.
+## Root cause
+The original dashboard used a nested/embedded Supabase query — `businesses.select("...subscriptions(billing_status, trial_end_date)")`. The admin panel uses the identical embed syntax successfully, but the admin panel goes through the service-role client (bypasses RLS entirely). The dashboard deliberately used the RLS-respecting client instead (matching the least-privilege design already documented), and RLS evaluated *through* a PostgREST join is a known source of silently-empty nested results — the top-level `businesses` row passed its own policy fine, but the embedded `subscriptions` rows were dropped rather than erroring, so `sub` was always `undefined`.
 
-## What was built
-- `app/business/dashboard/page.tsx` — protected via `requireRole(["business_owner"])`, unchanged from Milestone 2. Shows business status (pending/active/rejected/inactive with appropriate messaging for each), subscription/trial info when active, and business details. Includes inert placeholder cards for Menu (Milestone 4) and Orders (Milestone 5) — consistent with the existing stub-page pattern (`/browse`, `/register` before it had a real page).
-- Defensive redirect: if someone reaches this URL without a business (shouldn't normally happen — both entry points below prevent it), redirects to `/business/register` rather than showing a broken/empty page.
+## Fix
+Replaced the single nested-embed query with **two separate, direct top-level queries** — one for `businesses`, one for `subscriptions` — both still on the RLS-respecting client. Direct RLS evaluation (not through a join) is simpler and more reliable, and this keeps the dashboard's architecture consistent with what was already documented (no service-role client needed here, unlike the admin panel).
 
-## Redirect changes
-- `app/login/page.tsx` — "has a business" branch now goes to `/business/dashboard` instead of `/`.
-- `app/auth/callback/route.ts` — same fix, mirroring login for consistency (as it was always designed to).
-- `components/business/BusinessRegistrationForm.tsx` — after successful submission, redirects to `/business/dashboard` (which shows the same "pending review" status persistently) instead of a static one-time message with no way back to it. The now-unused `submitted` state and its dead rendering branch were removed — not leaving dead code behind, consistent with the standard set in the last full audit.
+## What's now displayed (all four items requested)
+- **Billing status** — from `subscriptions.billing_status`.
+- **Trial status** — derived (`"In trial"` if `trial_end_date` is in the future, `"Trial ended"` otherwise), since there's no dedicated column for this; computed from data that already exists rather than adding a new one.
+- **Trial start date** — from `businesses.trial_start_date` (a different table than the other three — added to the businesses query, wasn't there before).
+- **Trial end date** — from `subscriptions.trial_end_date`.
+
+## Explicit fallback, not silence
+If a business is `active` but genuinely has no subscription row (shouldn't happen given `approveBusiness` creates one, but could occur for edge cases like data imported before that code existed), the dashboard now explicitly says "No subscription record found for this business yet" instead of silently showing nothing — directly per your request to "explain why they are not available" if that's ever the case.
 
 ## Security review
-| Concern | Assessment |
-|---|---|
-| Can a business owner see another business's dashboard data? | No — query is scoped by `.eq("owner_id", user.id)`, and RLS independently enforces the same boundary regardless. |
-| Can a customer/guest reach this page? | No — `requireRole(["business_owner"])` redirects unauthenticated visitors to `/login`. |
-| Can an admin account get stuck here? | No — `requireRole(["business_owner"])` would redirect an admin-only account to `/unauthorized`, same as before; unaffected by this change. |
+No change in access boundary — both queries are still scoped by `.eq("owner_id", user.id)` / `.eq("business_id", ...)` server-side, and RLS independently enforces the same boundary. Splitting into two queries doesn't weaken anything, just makes each one's RLS evaluation more straightforward.
 
 ## What did NOT change
-`01_schema.sql` and all migrations, RLS policies, `lib/supabase/*`, `lib/auth/*`, `middleware.ts`, the admin panel, `Header.tsx` — all untouched.
+`01_schema.sql`, RLS policies themselves, `lib/supabase/*`, `lib/auth/*`, the admin panel, login/callback redirects — all untouched. Only the dashboard's data-fetching and display logic changed.
