@@ -33,17 +33,33 @@ function LoginForm() {
         return;
       }
 
-      // Check whether this business owner already has a business — if not,
-      // there's nothing useful at "/" for them yet (no dashboard exists
-      // until later in Milestone 3), so send them straight to registration
-      // instead of a dead end. RLS already scopes this query to their own
-      // business (businesses_select_active_public policy's owner_id =
-      // auth.uid() branch), so this is safe as a direct browser-client call.
+      // Check role FIRST — admin accounts have no business and were
+      // incorrectly falling through to the business-owner-only logic
+      // below, landing on /business/register, which then redirected them
+      // to /unauthorized (confirmed root cause of the reported bug).
       const {
         data: { user },
       } = await supabase.auth.getUser();
 
       if (user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", user.id)
+          .single();
+
+        if (profile?.role === "admin") {
+          window.location.href = "/admin";
+          return;
+        }
+
+        // Existing business-owner logic, unchanged: check whether this
+        // business owner already has a business — if not, there's nothing
+        // useful at "/" for them yet, so send them straight to
+        // registration instead of a dead end. RLS already scopes this
+        // query to their own business (businesses_select_active_public
+        // policy's owner_id = auth.uid() branch), so this is safe as a
+        // direct browser-client call.
         const { data: existingBusiness } = await supabase
           .from("businesses")
           .select("id")
