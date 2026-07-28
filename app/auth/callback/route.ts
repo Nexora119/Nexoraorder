@@ -40,6 +40,10 @@ export async function GET(request: NextRequest) {
         if (!existingBusiness) {
           return NextResponse.redirect(`${origin}/business/register`);
         }
+
+        // Business dashboard now exists (Milestone 3) — send them there
+        // instead of the homepage.
+        return NextResponse.redirect(`${origin}/business/dashboard`);
       }
 
       return NextResponse.redirect(`${origin}/`);
