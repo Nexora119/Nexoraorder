@@ -54,12 +54,17 @@ function LoginForm() {
           window.location.href = "/business/register";
           return;
         }
+
+        // Business dashboard now exists (Milestone 3) — send them there
+        // instead of the homepage, which has nothing useful for a
+        // logged-in business owner.
+        window.location.href = "/business/dashboard";
+        return;
       }
 
-      // Hard navigation (not router.push + router.refresh) — guarantees a
-      // fresh full request to "/", so the root layout's Header re-runs
-      // getAuthUser() against the just-set session cookie with zero
-      // ambiguity about client-router refresh timing.
+      // Fallback for the edge case where auth.getUser() somehow returns no
+      // user right after a successful sign-in — shouldn't normally happen,
+      // but degrades to the homepage rather than nothing.
       window.location.href = "/";
       return;
     } catch (err) {
