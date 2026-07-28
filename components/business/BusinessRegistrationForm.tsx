@@ -27,7 +27,6 @@ export function BusinessRegistrationForm({ ownerId }: Props) {
   const [operatingHours, setOperatingHours] = useState("");
 
   const [error, setError] = useState<string | null>(null);
-  const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: FormEvent) {
@@ -72,7 +71,11 @@ export function BusinessRegistrationForm({ ownerId }: Props) {
         return;
       }
 
-      setSubmitted(true);
+      // Dashboard now exists (Milestone 3) and shows this same "pending
+      // review" status persistently — redirect there instead of a static
+      // one-time message with no way back to it.
+      window.location.href = "/business/dashboard";
+      return;
     } catch (err) {
       setError(
         err instanceof Error
@@ -82,18 +85,6 @@ export function BusinessRegistrationForm({ ownerId }: Props) {
     } finally {
       setLoading(false);
     }
-  }
-
-  if (submitted) {
-    return (
-      <Card>
-        <h2 className="mb-2 text-h3">Business submitted for review</h2>
-        <p className="text-body text-text-secondary">
-          Thanks! Your business profile has been submitted. An admin will
-          review it, and you&apos;ll be able to go live once approved.
-        </p>
-      </Card>
-    );
   }
 
   return (
