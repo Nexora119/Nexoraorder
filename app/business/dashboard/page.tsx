@@ -14,7 +14,12 @@ interface DashboardBusiness {
   city: string | null;
   email: string;
   phone: string;
-  subscriptions: { billing_status: string; trial_end_date: string }[] | null;
+  trial_start_date: string | null;
+}
+
+interface DashboardSubscription {
+  billing_status: string;
+  trial_end_date: string;
 }
 
 // Protected: business_owner only. Reuses requireRole() unchanged.
@@ -25,6 +30,13 @@ interface DashboardBusiness {
 // branch, subscriptions_select_own). No new RLS needed, unlike the admin
 // panel which genuinely required the service-role client for cross-user
 // access.
+//
+// Deliberately TWO separate top-level queries rather than one nested
+// embed (business.select("...subscriptions(...)")). The embedded form
+// silently returned no subscription rows even when one existed — a known
+// class of issue where RLS evaluated through a PostgREST join behaves
+// unreliably. Two direct queries, each evaluating RLS against its own
+// table directly, avoids that entirely.
 export default async function BusinessDashboardPage() {
   const user = await requireRole(["business_owner"]);
 
@@ -32,7 +44,7 @@ export default async function BusinessDashboardPage() {
   const { data: business } = await supabase
     .from("businesses")
     .select(
-      "id, name, category, status, rejection_reason, street_address, suburb, city, email, phone, subscriptions(billing_status, trial_end_date)"
+      "id, name, category, status, rejection_reason, street_address, suburb, city, email, phone, trial_start_date"
     )
     .eq("owner_id", user.id)
     .maybeSingle();
@@ -45,7 +57,14 @@ export default async function BusinessDashboardPage() {
   }
 
   const typedBusiness = business as unknown as DashboardBusiness;
-  const sub = typedBusiness.subscriptions?.[0];
+
+  const { data: subscription } = await supabase
+    .from("subscriptions")
+    .select("billing_status, trial_end_date")
+    .eq("business_id", typedBusiness.id)
+    .maybeSingle();
+
+  const sub = subscription as unknown as DashboardSubscription | null;
 
   return (
     <main className="min-h-screen px-4 py-12">
@@ -66,11 +85,26 @@ export default async function BusinessDashboardPage() {
           {typedBusiness.status === "active" && (
             <div className="flex flex-col gap-1">
               <p className="text-body text-success">Active and visible to customers.</p>
-              {sub && (
-                <p className="text-small text-text-secondary">
-                  Subscription: {sub.billing_status}
-                  {sub.trial_end_date &&
-                    ` (trial ends ${new Date(sub.trial_end_date).toLocaleDateString()})`}
+              {sub ? (
+                <div className="text-small text-text-secondary flex flex-col gap-0.5 mt-1">
+                  <p>Billing status: {sub.billing_status}</p>
+                  <p>
+                    Trial status:{" "}
+                    {new Date(sub.trial_end_date) > new Date() ? "In trial" : "Trial ended"}
+                  </p>
+                  {typedBusiness.trial_start_date && (
+                    <p>
+                      Trial start date:{" "}
+                      {new Date(typedBusiness.trial_start_date).toLocaleDateString()}
+                    </p>
+                  )}
+                  <p>
+                    Trial end date: {new Date(sub.trial_end_date).toLocaleDateString()}
+                  </p>
+                </div>
+              ) : (
+                <p className="text-small text-text-secondary mt-1">
+                  No subscription record found for this business yet.
                 </p>
               )}
             </div>
