@@ -23,14 +23,23 @@ export async function GET(request: NextRequest) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error) {
-      // Session is now established (cookie set). Same "does this business
-      // owner already have a business" check already used in
-      // app/login/page.tsx, so both entry points behave consistently.
+      // Session is now established (cookie set). Check role FIRST — same
+      // fix just applied to app/login/page.tsx, kept consistent here.
       const {
         data: { user },
       } = await supabase.auth.getUser();
 
       if (user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", user.id)
+          .single();
+
+        if (profile?.role === "admin") {
+          return NextResponse.redirect(`${origin}/admin`);
+        }
+
         const { data: existingBusiness } = await supabase
           .from("businesses")
           .select("id")
