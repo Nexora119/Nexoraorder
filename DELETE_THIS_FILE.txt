@@ -1,8 +1,0 @@
-This delta ZIP includes one file to REPLACE and one file to DELETE:
-
-REPLACE:
-  app/signup/page.tsx  (removes the leftover debug console.log)
-
-DELETE from your repo (not included here, since it's a deletion not a file):
-  app/debug/auth/page.tsx  (and the now-empty app/debug/ folder, if your
-  git client doesn't clean that up automatically)
