@@ -49,11 +49,6 @@ export async function getAuthUser(): Promise<AuthedUser | null> {
       error,
     } = await supabase.auth.getUser();
 
-    console.log("[AUTH DEBUG]", {
-      authUserId: user?.id,
-      authEmail: user?.email,
-    });
-
     if (error) {
       console.error("[getAuthUser] auth.getUser() returned an error:", error.message);
       return null;
@@ -69,10 +64,6 @@ export async function getAuthUser(): Promise<AuthedUser | null> {
       .select("role")
       .eq("id", user.id)
       .single();
-
-    console.log(
-      `[ROLE DEBUG] role="${profile?.role}" length=${profile?.role?.length}`
-    );
 
     if (profileError) {
       console.error(
@@ -126,12 +117,6 @@ export async function requireUser(): Promise<AuthedUser> {
  */
 export async function requireRole(allowedRoles: UserRole[]): Promise<AuthedUser> {
   const user = await requireUser();
-
-  console.log("[REQUIRE ROLE]", {
-    userRole: user.role,
-    allowedRoles,
-    includes: allowedRoles.includes(user.role),
-  });
 
   if (!allowedRoles.includes(user.role)) {
     redirect("/unauthorized");
