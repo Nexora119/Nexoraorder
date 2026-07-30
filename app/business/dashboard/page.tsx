@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth/authorize";
 import { createClient } from "@/lib/supabase/server";
 import { Card } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
 
 interface DashboardBusiness {
   id: string;
@@ -136,12 +137,16 @@ export default async function BusinessDashboardPage() {
           </p>
         </Card>
 
-        {/* Placeholders for future milestones — deliberately inert, not
-            built yet. Menu Management (Milestone 4) and Customer Ordering
-            (Milestone 5) will replace these with real functionality. */}
-        <Card className="opacity-60">
+        {/* Menu is now real (Milestone 4). Orders remains a deliberately
+            inert placeholder — Milestone 5 will replace it. */}
+        <Card>
           <h2 className="text-h4 mb-1">Menu</h2>
-          <p className="text-small text-text-secondary">Coming soon (Milestone 4).</p>
+          <p className="text-small text-text-secondary mb-3">
+            Manage what customers see and order.
+          </p>
+          <Button variant="secondary" href="/business/menu">
+            Manage menu
+          </Button>
         </Card>
 
         <Card className="opacity-60">
