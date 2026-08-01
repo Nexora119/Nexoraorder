@@ -1,17 +1,18 @@
-# CHANGELOG — Milestone 4: Menu Management
+# CHANGELOG — Menu Image Optimization
 
 ## Added
-- `05_menu_categories.sql` — adds `category` column to `menu_items` (the one real schema gap; everything else already supported by existing RLS).
-- `lib/menu/actions.ts` — `addMenuItem`, `updateMenuItem`, `deleteMenuItem`, `toggleAvailability`. Regular RLS-respecting client throughout, never service-role. Each independently re-checks `requireRole(["business_owner"])`.
-- `app/business/menu/page.tsx` — list page: empty state, Add Item button, per-item Edit/Delete/Toggle.
-- `app/business/menu/new/page.tsx` — add item form.
-- `app/business/menu/[id]/edit/page.tsx` — edit item form, pre-filled from the existing row.
+- `07_menu_image_optimization.sql` — adds `photo_thumbnail_url` column to `menu_items`.
+- `sharp` dependency in `package.json` for server-side image processing.
 
 ## Modified
-- `app/business/dashboard/page.tsx` — Menu card changed from an inert "Coming soon" placeholder to a real link to `/business/menu`. Added the `Button` import needed for this (was missing before, only `Card` was imported).
+- `lib/menu/storage.ts` — rewritten: `processAndUploadMenuImage` replaces `uploadMenuImage`, now validating actual pixel dimensions (not just file size/MIME type), generating a 400×400 WebP thumbnail always, and a capped-1600px WebP "full" version only when the source is meaningfully larger than the thumbnail. `deleteMenuImages` replaces `deleteMenuImage`, now deleting both variants per item (deduplicated when they're the same file).
+- `lib/menu/actions.ts` — `addMenuItem`, `updateMenuItem`, `deleteMenuItem` updated to read/write both `photo_url` and `photo_thumbnail_url`, and to clean up both files on replace/remove/delete. `toggleAvailability` untouched.
+- `components/menu/MenuItemImage.tsx` — added `loading="lazy"`.
+- `app/business/menu/page.tsx` — renders the thumbnail (`photo_thumbnail_url || photo_url`) on each card instead of the full image.
+- `app/business/menu/[id]/edit/page.tsx` — fetches `photo_thumbnail_url`, passes it as the edit form's image preview.
 
 ## Removed
-- None.
+- None (the prior single-file storage helpers were replaced, not left alongside the new ones).
 
 ## Why
-Implements Milestone 4 per the roadmap: business owners can now fully manage their menu (add, edit, delete, toggle availability), gated by the same `requireRole(["business_owner"])` used throughout, secured by the existing `menu_items_owner_manage` RLS policy with zero new policies needed.
+Direct performance/scale refinement per your request: menu listings now load smaller, pre-optimized thumbnails instead of full-size uploaded images; dimension validation guards against pathological uploads; the per-item storage folder structure keeps management simple regardless of how many items accumulate system-wide.

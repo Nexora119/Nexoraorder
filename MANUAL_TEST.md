@@ -1,45 +1,35 @@
-# MANUAL_TEST.md — Milestone 4: Menu Management
+# MANUAL_TEST.md — Menu Image Optimization
 
 ## Required first
-1. Run `05_menu_categories.sql` in Supabase's SQL Editor (after 01-04).
-2. Confirm in Table Editor: `menu_items` now has a `category` column.
+1. Run `07_menu_image_optimization.sql` in Supabase's SQL Editor (after 01-06).
+2. Confirm `menu_items` now has a `photo_thumbnail_url` column.
+3. Redeploy so `npm install` picks up the new `sharp` dependency — confirm the build succeeds (sharp requires a native binary; Vercel's build environment supports this automatically, but worth confirming the deploy log shows no errors around it).
 
-## Requires Vercel deployment
-3. Deploy all 5 changed/new files.
-4. Log in as a business owner with an active (or pending) business.
-5. On `/business/dashboard`, confirm the Menu card now says "Manage menu" with a working button (not "Coming soon").
-6. Visit `/business/menu` — should show the empty state ("No menu items yet...").
+## Thumbnail generation
+4. Add a new menu item with a large photo (e.g. a typical phone photo, several MB, several thousand pixels wide).
+5. Confirm it uploads successfully and appears on `/business/menu`.
+6. In Supabase Storage, confirm TWO files now exist under `menu-images/{business_id}/{some-uuid}/`: `thumb.webp` and `full.webp`.
+7. Confirm the thumbnail file is small (well under 100KB typically) and the full file is larger but still capped (not the original multi-MB size).
 
-### Add
-7. Click "Add Item," fill in Name and Price only (leave description/category/image blank) — submit.
-   - Should redirect to `/business/menu` and show the new item.
-8. Click "Add Item" again, leave Name blank, try to submit — browser should block it (native `required`). Bypass this by testing directly if needed, or trust the server-side check (step 9).
-9. Try adding an item with Price = 0 or a negative number — should show "Price must be greater than zero," item should NOT be created.
-10. Add a second item with all fields filled in (description, category, image URL) — confirm all fields display correctly on the list.
+## Small-image handling
+8. Add another item using a small image (e.g. under 400px wide/tall if you have one, or a small screenshot).
+9. Confirm only ONE file exists in its storage folder this time (no separate `full.webp`) — this is the "retain higher-res original when appropriate" behavior; a source that's already thumbnail-sized doesn't get a redundant near-duplicate.
 
-### Edit
-11. Click "Edit" on an item — form should be pre-filled with its current values.
-12. Change the name and price, save — confirm the list reflects the changes.
-13. Try clearing the price field and saving — should show the validation error, not silently fail.
+## Dimension validation
+10. If you can find or create a test image with unusually large pixel dimensions (e.g. a stitched panorama over 8000px on one side, even if the file size itself is small) — try uploading it, should show a dimension-related error, not succeed.
 
-### Toggle
-14. Click "Mark Unavailable" on an item — badge should flip to "Unavailable," button label should flip to "Mark Available."
-15. Click it again — should flip back.
+## Display
+11. Confirm `/business/menu` loads noticeably faster with several items than it did with full-size images (informal check — should feel snappier, especially on a throttled/mobile connection).
+12. Confirm images are still consistently sized and cropped (not stretched) on the list.
 
-### Delete
-16. Delete an item — should disappear from the list immediately.
-17. Delete all items — should return to the empty state.
-
-### Security (if you can test with two business owner accounts)
-18. As Business Owner A, note a menu item's URL (`/business/menu/<id>/edit`).
-19. Log in as Business Owner B, try visiting that exact URL directly.
-   - Should show a 404 (via `notFound()`), not Business Owner A's item.
-
-### Mobile
-20. Check `/business/menu`, the Add form, and the Edit form on a narrow viewport — should stack cleanly, no horizontal scrolling, buttons full-width where expected.
+## Edit / Replace / Remove — re-verify with the new two-file structure
+13. Edit an item, replace its image with a new one — confirm both OLD files (thumb + full) are gone from Storage, and both NEW files exist.
+14. Edit an item, remove its image — confirm both files are deleted, placeholder shows on the list.
+15. Delete an item entirely — confirm both its files are gone from Storage (no orphans left behind, including the case from item 9 where there was only one file to begin with).
 
 ## What to report back
-- Does every CRUD operation work correctly?
-- Does price validation correctly reject zero/negative values?
-- Does the cross-owner security test (steps 18-19) show a 404, not someone else's data?
-- Anything unexpected in console or Vercel logs?
+- Does the build succeed with the new `sharp` dependency?
+- Do thumbnails generate correctly and load fast?
+- Does the "skip redundant full version" behavior work for small source images?
+- Does dimension validation catch an oversized image if you're able to test it?
+- Confirmed no orphaned files after replace/remove/delete?
