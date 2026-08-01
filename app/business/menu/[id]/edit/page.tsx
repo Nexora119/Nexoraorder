@@ -3,6 +3,7 @@ import { requireRole } from "@/lib/auth/authorize";
 import { createClient } from "@/lib/supabase/server";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { ImageUploadField } from "@/components/menu/ImageUploadField";
 import { updateMenuItem } from "@/lib/menu/actions";
 
 interface MenuItemDetail {
@@ -12,6 +13,7 @@ interface MenuItemDetail {
   price: number;
   category: string | null;
   photo_url: string | null;
+  photo_thumbnail_url: string | null;
 }
 
 // Protected: business_owner only.
@@ -30,7 +32,7 @@ export default async function EditMenuItemPage({
   // ownership check needed here.
   const { data: item } = await supabase
     .from("menu_items")
-    .select("id, name, description, price, category, photo_url")
+    .select("id, name, description, price, category, photo_url, photo_thumbnail_url")
     .eq("id", params.id)
     .maybeSingle();
 
@@ -110,19 +112,11 @@ export default async function EditMenuItemPage({
               </div>
             </div>
 
-            <div>
-              <label htmlFor="photo_url" className="block text-small font-medium mb-1">
-                Image URL <span className="text-text-secondary font-normal">(optional)</span>
-              </label>
-              <input
-                id="photo_url"
-                name="photo_url"
-                type="url"
-                defaultValue={menuItem.photo_url ?? ""}
-                className="w-full rounded-md border border-border px-4 py-3 text-body
-                           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-              />
-            </div>
+            {/* Thumbnail preferred for the preview — smaller, faster to
+                load in this form than the full-size image. */}
+            <ImageUploadField
+              existingImageUrl={menuItem.photo_thumbnail_url || menuItem.photo_url}
+            />
 
             {searchParams.error && (
               <p
