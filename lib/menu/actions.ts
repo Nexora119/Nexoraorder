@@ -4,6 +4,11 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth/authorize";
 import { createClient } from "@/lib/supabase/server";
+import {
+  processAndUploadMenuImage,
+  deleteMenuImages,
+  validateImageFile,
+} from "@/lib/menu/storage";
 
 // OWNER-SCOPED OPERATIONS ONLY. Uses the regular RLS-respecting server
 // client (lib/supabase/server.ts) throughout — NEVER the service-role
@@ -48,11 +53,23 @@ export async function addMenuItem(formData: FormData) {
   const description = formData.get("description")?.toString().trim() ?? "";
   const priceRaw = formData.get("price")?.toString().trim() ?? "";
   const category = formData.get("category")?.toString().trim() ?? "";
-  const photoUrl = formData.get("photo_url")?.toString().trim() ?? "";
 
   const validationError = validateMenuItemInput(name, priceRaw);
   if (validationError) {
     redirect(`/business/menu/new?error=${encodeURIComponent(validationError)}`);
+  }
+
+  const imageEntry = formData.get("image");
+  const hasImageFile = imageEntry instanceof File && imageEntry.size > 0;
+
+  // Checked before the try/catch (and before ever touching Storage) so a
+  // bad file gives an immediate, friendly redirect rather than an
+  // unnecessary processing attempt that would fail anyway.
+  if (hasImageFile) {
+    const fileError = validateImageFile(imageEntry as File);
+    if (fileError) {
+      redirect(`/business/menu/new?error=${encodeURIComponent(fileError)}`);
+    }
   }
 
   let target = "/business/menu";
@@ -69,20 +86,44 @@ export async function addMenuItem(formData: FormData) {
     if (!business) {
       target = "/business/register";
     } else {
-      const { error } = await supabase.from("menu_items").insert({
-        business_id: business.id,
-        name,
-        description: description || null,
-        price: Number(priceRaw),
-        category: category || null,
-        photo_url: photoUrl || null,
-        available: true,
-      });
+      let fullUrl: string | null = null;
+      let thumbnailUrl: string | null = null;
+      let uploadFailed = false;
 
-      if (error) {
-        target = `/business/menu/new?error=${encodeURIComponent(error.message)}`;
-      } else {
-        revalidatePath("/business/menu");
+      if (hasImageFile) {
+        const { urls, error: uploadError } = await processAndUploadMenuImage(
+          supabase,
+          business.id,
+          imageEntry as File
+        );
+        if (uploadError || !urls) {
+          target = `/business/menu/new?error=${encodeURIComponent(
+            uploadError ?? "Image processing failed."
+          )}`;
+          uploadFailed = true;
+        } else {
+          fullUrl = urls.fullUrl;
+          thumbnailUrl = urls.thumbnailUrl;
+        }
+      }
+
+      if (!uploadFailed) {
+        const { error } = await supabase.from("menu_items").insert({
+          business_id: business.id,
+          name,
+          description: description || null,
+          price: Number(priceRaw),
+          category: category || null,
+          photo_url: fullUrl,
+          photo_thumbnail_url: thumbnailUrl,
+          available: true,
+        });
+
+        if (error) {
+          target = `/business/menu/new?error=${encodeURIComponent(error.message)}`;
+        } else {
+          revalidatePath("/business/menu");
+        }
       }
     }
   } catch (err) {
@@ -103,7 +144,6 @@ export async function updateMenuItem(itemId: string, formData: FormData) {
   const description = formData.get("description")?.toString().trim() ?? "";
   const priceRaw = formData.get("price")?.toString().trim() ?? "";
   const category = formData.get("category")?.toString().trim() ?? "";
-  const photoUrl = formData.get("photo_url")?.toString().trim() ?? "";
 
   const validationError = validateMenuItemInput(name, priceRaw);
   if (validationError) {
@@ -112,38 +152,112 @@ export async function updateMenuItem(itemId: string, formData: FormData) {
     );
   }
 
+  const imageEntry = formData.get("image");
+  const hasImageFile = imageEntry instanceof File && imageEntry.size > 0;
+  const removeImage = formData.get("remove_image") === "true";
+
+  if (hasImageFile) {
+    const fileError = validateImageFile(imageEntry as File);
+    if (fileError) {
+      redirect(`/business/menu/${itemId}/edit?error=${encodeURIComponent(fileError)}`);
+    }
+  }
+
   let target = "/business/menu";
 
   try {
     const supabase = createClient();
 
-    // No explicit ownership check needed here beyond RLS itself —
-    // menu_items_owner_manage means this UPDATE simply affects zero rows
-    // if the item doesn't belong to this owner's business, rather than
-    // needing an application-level check to prevent cross-owner edits.
-    const { data, error } = await supabase
+    // Need the current photo_url/photo_thumbnail_url and business_id
+    // first — the former pair to clean up on replace/remove, the latter
+    // for the upload path (RLS requires it to match a business this owner
+    // actually owns).
+    const { data: existingItem } = await supabase
       .from("menu_items")
-      .update({
-        name,
-        description: description || null,
-        price: Number(priceRaw),
-        category: category || null,
-        photo_url: photoUrl || null,
-      })
+      .select("photo_url, photo_thumbnail_url, business_id")
       .eq("id", itemId)
-      .select("id");
+      .maybeSingle();
 
-    if (error) {
-      target = `/business/menu/${itemId}/edit?error=${encodeURIComponent(error.message)}`;
-    } else if (!data || data.length === 0) {
-      // RLS silently blocked it (not this owner's item) rather than
-      // erroring — surface that as a clear message instead of a silent
-      // no-op that looks like success.
+    if (!existingItem) {
+      // Either doesn't exist, or RLS blocked it (not this owner's item).
       target = `/business/menu?error=${encodeURIComponent(
-        "That item couldn't be updated — it may not belong to your business."
+        "That item couldn't be found."
       )}`;
     } else {
-      revalidatePath("/business/menu");
+      // undefined = leave photo fields untouched; null = clear them;
+      // string = replace with the new uploaded URLs.
+      let fullUrl: string | null | undefined = undefined;
+      let thumbnailUrl: string | null | undefined = undefined;
+      let uploadFailed = false;
+
+      if (hasImageFile) {
+        const { urls, error: uploadError } = await processAndUploadMenuImage(
+          supabase,
+          existingItem.business_id,
+          imageEntry as File
+        );
+        if (uploadError || !urls) {
+          target = `/business/menu/${itemId}/edit?error=${encodeURIComponent(
+            uploadError ?? "Image processing failed."
+          )}`;
+          uploadFailed = true;
+        } else {
+          fullUrl = urls.fullUrl;
+          thumbnailUrl = urls.thumbnailUrl;
+          // New images uploaded successfully — clean up the old pair so
+          // they don't become orphaned files (same principle as deletion,
+          // applied here too even though only explicitly required there).
+          await deleteMenuImages(
+            supabase,
+            existingItem.photo_url,
+            existingItem.photo_thumbnail_url
+          );
+        }
+      } else if (removeImage) {
+        await deleteMenuImages(
+          supabase,
+          existingItem.photo_url,
+          existingItem.photo_thumbnail_url
+        );
+        fullUrl = null;
+        thumbnailUrl = null;
+      }
+
+      if (!uploadFailed) {
+        const updatePayload: {
+          name: string;
+          description: string | null;
+          price: number;
+          category: string | null;
+          photo_url?: string | null;
+          photo_thumbnail_url?: string | null;
+        } = {
+          name,
+          description: description || null,
+          price: Number(priceRaw),
+          category: category || null,
+        };
+        if (fullUrl !== undefined) {
+          updatePayload.photo_url = fullUrl;
+          updatePayload.photo_thumbnail_url = thumbnailUrl;
+        }
+
+        const { data, error } = await supabase
+          .from("menu_items")
+          .update(updatePayload)
+          .eq("id", itemId)
+          .select("id");
+
+        if (error) {
+          target = `/business/menu/${itemId}/edit?error=${encodeURIComponent(error.message)}`;
+        } else if (!data || data.length === 0) {
+          target = `/business/menu?error=${encodeURIComponent(
+            "That item couldn't be updated — it may not belong to your business."
+          )}`;
+        } else {
+          revalidatePath("/business/menu");
+        }
+      }
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
@@ -163,6 +277,15 @@ export async function deleteMenuItem(itemId: string, _formData: FormData) {
 
   try {
     const supabase = createClient();
+
+    // Fetch photo fields BEFORE deleting the row — need them afterward to
+    // know what to remove from Storage.
+    const { data: existingItem } = await supabase
+      .from("menu_items")
+      .select("photo_url, photo_thumbnail_url")
+      .eq("id", itemId)
+      .maybeSingle();
+
     const { data, error } = await supabase
       .from("menu_items")
       .delete()
@@ -176,6 +299,13 @@ export async function deleteMenuItem(itemId: string, _formData: FormData) {
         "That item couldn't be deleted — it may not belong to your business."
       )}`;
     } else {
+      // Row confirmed deleted — now safe to clean up its images, if any,
+      // so orphaned files don't accumulate in Storage.
+      await deleteMenuImages(
+        supabase,
+        existingItem?.photo_url,
+        existingItem?.photo_thumbnail_url
+      );
       revalidatePath("/business/menu");
     }
   } catch (err) {
