@@ -3,6 +3,7 @@ import { requireRole } from "@/lib/auth/authorize";
 import { createClient } from "@/lib/supabase/server";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { MenuItemImage } from "@/components/menu/MenuItemImage";
 import { deleteMenuItem, toggleAvailability } from "@/lib/menu/actions";
 
 interface MenuItemRow {
@@ -12,6 +13,7 @@ interface MenuItemRow {
   price: number;
   category: string | null;
   photo_url: string | null;
+  photo_thumbnail_url: string | null;
   available: boolean;
 }
 
@@ -39,7 +41,7 @@ export default async function MenuPage({
 
   const { data: items } = await supabase
     .from("menu_items")
-    .select("id, name, description, price, category, photo_url, available")
+    .select("id, name, description, price, category, photo_url, photo_thumbnail_url, available")
     .eq("business_id", business.id)
     .order("created_at", { ascending: false });
 
@@ -75,6 +77,14 @@ export default async function MenuPage({
         {menuItems.map((item) => (
           <Card key={item.id}>
             <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+              {/* Thumbnail preferred here — smaller, pre-optimized for
+                  fast list rendering. Falls back to the full image only
+                  for items uploaded before thumbnails existed. */}
+              <MenuItemImage
+                src={item.photo_thumbnail_url || item.photo_url}
+                alt={item.name}
+              />
+
               <div className="flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="text-h4">{item.name}</h3>
