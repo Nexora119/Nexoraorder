@@ -1,6 +1,7 @@
 import { requireRole } from "@/lib/auth/authorize";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { ImageUploadField } from "@/components/menu/ImageUploadField";
 import { addMenuItem } from "@/lib/menu/actions";
 
 // Protected: business_owner only.
@@ -80,23 +81,7 @@ export default async function NewMenuItemPage({
               </div>
             </div>
 
-            <div>
-              <label htmlFor="photo_url" className="block text-small font-medium mb-1">
-                Image URL <span className="text-text-secondary font-normal">(optional)</span>
-              </label>
-              <input
-                id="photo_url"
-                name="photo_url"
-                type="url"
-                className="w-full rounded-md border border-border px-4 py-3 text-body
-                           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                placeholder="https://..."
-              />
-              <p className="text-small text-text-secondary mt-1">
-                Direct image upload isn&apos;t available yet — paste a link to an
-                image hosted elsewhere if you have one.
-              </p>
-            </div>
+            <ImageUploadField />
 
             {searchParams.error && (
               <p
