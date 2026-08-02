@@ -118,9 +118,30 @@ export async function processAndUploadMenuImage(
       .toBuffer();
 
     const thumbPath = `${folder}/thumb.webp`;
-    const { error: thumbUploadError } = await supabase.storage
+
+    // TEMPORARY DIAGNOSTIC — determine whether this Storage request is
+    // actually authenticated, per your instruction. Not modifying the
+    // upload call itself, just observing state immediately before it.
+    {
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
+      console.log("=== STORAGE DEBUG (thumbnail) ===");
+      console.log("Current user:", user);
+      console.log("Auth error:", authError);
+      console.log("Business ID:", businessId);
+      console.log("Upload path:", thumbPath);
+      console.log("Bucket:", MENU_IMAGES_BUCKET);
+    }
+
+    const thumbUploadResult = await supabase.storage
       .from(MENU_IMAGES_BUCKET)
       .upload(thumbPath, thumbnailBuffer, { contentType: "image/webp" });
+
+    console.log("Upload result (thumbnail):", thumbUploadResult);
+
+    const { error: thumbUploadError } = thumbUploadResult;
 
     if (thumbUploadError) {
       return { urls: null, error: thumbUploadError.message };
@@ -148,9 +169,28 @@ export async function processAndUploadMenuImage(
         .toBuffer();
 
       const fullPath = `${folder}/full.webp`;
-      const { error: fullUploadError } = await supabase.storage
+
+      // TEMPORARY DIAGNOSTIC — same pattern as the thumbnail upload above.
+      {
+        const {
+          data: { user },
+          error: authError,
+        } = await supabase.auth.getUser();
+        console.log("=== STORAGE DEBUG (full) ===");
+        console.log("Current user:", user);
+        console.log("Auth error:", authError);
+        console.log("Business ID:", businessId);
+        console.log("Upload path:", fullPath);
+        console.log("Bucket:", MENU_IMAGES_BUCKET);
+      }
+
+      const fullUploadResult = await supabase.storage
         .from(MENU_IMAGES_BUCKET)
         .upload(fullPath, fullBuffer, { contentType: "image/webp" });
+
+      console.log("Upload result (full):", fullUploadResult);
+
+      const { error: fullUploadError } = fullUploadResult;
 
       if (fullUploadError) {
         // Thumbnail already uploaded successfully at this point — clean it
