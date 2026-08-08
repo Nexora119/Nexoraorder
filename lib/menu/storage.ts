@@ -121,15 +121,22 @@ export async function processAndUploadMenuImage(
 
     // TEMPORARY DIAGNOSTIC — determine whether this Storage request is
     // actually authenticated, per your instruction. Not modifying the
-    // upload call itself, just observing state immediately before it.
+    // upload call itself, just observing state immediately before/after it.
     {
       const {
         data: { user },
-        error: authError,
+        error: getUserError,
       } = await supabase.auth.getUser();
-      console.log("=== STORAGE DEBUG (thumbnail) ===");
-      console.log("Current user:", user);
-      console.log("Auth error:", authError);
+      const {
+        data: { session },
+        error: getSessionError,
+      } = await supabase.auth.getSession();
+      console.log("=== STORAGE DEBUG ===");
+      console.log("Call:", "thumbnail");
+      console.log("auth.getUser() user:", user);
+      console.log("auth.getUser() error:", getUserError);
+      console.log("auth.getSession() session:", session);
+      console.log("auth.getSession() error:", getSessionError);
       console.log("Business ID:", businessId);
       console.log("Upload path:", thumbPath);
       console.log("Bucket:", MENU_IMAGES_BUCKET);
@@ -139,7 +146,10 @@ export async function processAndUploadMenuImage(
       .from(MENU_IMAGES_BUCKET)
       .upload(thumbPath, thumbnailBuffer, { contentType: "image/webp" });
 
-    console.log("Upload result (thumbnail):", thumbUploadResult);
+    console.log("=== STORAGE DEBUG ===");
+    console.log("Call:", "thumbnail");
+    console.log("Upload result data:", thumbUploadResult.data);
+    console.log("Upload result error:", thumbUploadResult.error);
 
     const { error: thumbUploadError } = thumbUploadResult;
 
@@ -174,11 +184,18 @@ export async function processAndUploadMenuImage(
       {
         const {
           data: { user },
-          error: authError,
+          error: getUserError,
         } = await supabase.auth.getUser();
-        console.log("=== STORAGE DEBUG (full) ===");
-        console.log("Current user:", user);
-        console.log("Auth error:", authError);
+        const {
+          data: { session },
+          error: getSessionError,
+        } = await supabase.auth.getSession();
+        console.log("=== STORAGE DEBUG ===");
+        console.log("Call:", "full");
+        console.log("auth.getUser() user:", user);
+        console.log("auth.getUser() error:", getUserError);
+        console.log("auth.getSession() session:", session);
+        console.log("auth.getSession() error:", getSessionError);
         console.log("Business ID:", businessId);
         console.log("Upload path:", fullPath);
         console.log("Bucket:", MENU_IMAGES_BUCKET);
@@ -188,7 +205,10 @@ export async function processAndUploadMenuImage(
         .from(MENU_IMAGES_BUCKET)
         .upload(fullPath, fullBuffer, { contentType: "image/webp" });
 
-      console.log("Upload result (full):", fullUploadResult);
+      console.log("=== STORAGE DEBUG ===");
+      console.log("Call:", "full");
+      console.log("Upload result data:", fullUploadResult.data);
+      console.log("Upload result error:", fullUploadResult.error);
 
       const { error: fullUploadError } = fullUploadResult;
 
